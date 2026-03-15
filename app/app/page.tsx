@@ -378,8 +378,7 @@ export default function EchoNad() {
     const localBet = { id: Math.random(), ring, sector, amount: betSize, placedAt: scanRef.current };
     setActiveBets(prev => [...prev, localBet]);
 
-    // Send on-chain tx
-    setTxPending(true);
+    // Send on-chain tx - Monad is INSTANT (400ms blocks)
     const txStart = performance.now();
     try {
       const direction = sector <= 3 ? 0 : 1; // 0=BULLISH, 1=BEARISH
@@ -387,7 +386,7 @@ export default function EchoNad() {
       const priceWith8Decimals = Math.round(curPrice * 1e8).toString(16);
 
       // Encode function call: placeBet(uint8,uint256,uint256)
-      const iface = "0x" + [
+      const data = "0x" + [
         "b6846e30", // function selector for placeBet(uint8,uint256,uint256)
         direction.toString(16).padStart(64, "0"),
         multiplier.toString(16).padStart(64, "0"),
@@ -396,14 +395,14 @@ export default function EchoNad() {
 
       const value = "0x" + Math.round(betSize * 1e18).toString(16);
 
-      // Use eth_sendRawTransactionSync on Monad for instant confirmation!
+      // Send transaction - Monad confirms in ~400ms!
       const txHash = await window.ethereum.request({
         method: "eth_sendTransaction",
         params: [{
           from: account,
           to: CONTRACT_ADDRESS,
           value: value,
-          data: iface,
+          data: data,
           gas: "0x30D40", // 200000
         }],
       });
@@ -518,41 +517,41 @@ export default function EchoNad() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid rgba(131,110,249,0.1)", background: "rgba(11,4,21,0.85)", flexWrap: "wrap", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <img src="/logo.svg" alt="Monad" style={{ height: 24 }} />
-          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: 3 }}>
+          <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: 3 }}>
             <span style={{ color: MONAD_GOLD }}>ECHO</span><span style={{ color: MONAD_PURPLE }}>NAD</span>
           </div>
-          <div style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 8, padding: "2px 10px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
-            <span style={{ width: 5, height: 5, borderRadius: "50%", background: delta >= 0 ? MONAD_GREEN : MONAD_RED, display: "inline-block" }} />
+          <div style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 8, padding: "4px 14px", fontSize: 16, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: delta >= 0 ? MONAD_GREEN : MONAD_RED, display: "inline-block" }} />
             <span style={{ color: MONAD_GOLD, fontWeight: 600 }}>${curPrice.toFixed(4)}</span>
-            <span style={{ fontSize: 9, color: delta >= 0 ? MONAD_GREEN : MONAD_RED }}>{delta >= 0 ? "+" : ""}{(delta * 10000).toFixed(1)}bp</span>
+            <span style={{ fontSize: 13, color: delta >= 0 ? MONAD_GREEN : MONAD_RED }}>{delta >= 0 ? "+" : ""}{(delta * 10000).toFixed(1)}bp</span>
           </div>
-          <div style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: isUp ? "rgba(74,222,128,0.08)" : "rgba(251,113,133,0.08)", color: isUp ? MONAD_GREEN : MONAD_RED }}>{SECTOR_META[activeSector].shortDir}</div>
-          <div style={{ fontSize: 7, color: "rgba(131,110,249,0.3)", display: "flex", alignItems: "center", gap: 3 }}>
-            <span style={{ width: 4, height: 4, borderRadius: "50%", background: MONAD_GREEN }} />{oracleStatus}
+          <div style={{ fontSize: 13, padding: "3px 10px", borderRadius: 4, background: isUp ? "rgba(74,222,128,0.08)" : "rgba(251,113,133,0.08)", color: isUp ? MONAD_GREEN : MONAD_RED }}>{SECTOR_META[activeSector].shortDir}</div>
+          <div style={{ fontSize: 11, color: "rgba(131,110,249,0.3)", display: "flex", alignItems: "center", gap: 3 }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: MONAD_GREEN }} />{oracleStatus}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {lastTxTime && (
-            <div style={{ fontSize: 9, color: MONAD_GREEN, background: "rgba(74,222,128,0.08)", padding: "2px 8px", borderRadius: 4 }}>
+            <div style={{ fontSize: 12, color: MONAD_GREEN, background: "rgba(74,222,128,0.08)", padding: "4px 12px", borderRadius: 6 }}>
               TX: {lastTxTime}ms
             </div>
           )}
-          {streak >= 2 && <div style={{ background: `linear-gradient(90deg,${MONAD_PURPLE},${MONAD_HOT},${MONAD_PURPLE})`, backgroundSize: "200% auto", animation: "streak-flash 2s linear infinite", padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{streak}x STREAK</div>}
+          {streak >= 2 && <div style={{ background: `linear-gradient(90deg,${MONAD_PURPLE},${MONAD_HOT},${MONAD_PURPLE})`, backgroundSize: "200% auto", animation: "streak-flash 2s linear infinite", padding: "4px 14px", borderRadius: 20, fontSize: 14, fontWeight: 700 }}>{streak}x STREAK</div>}
           {account ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 7, color: "rgba(167,139,250,0.3)", letterSpacing: 2 }}>MON</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: MONAD_GREEN }}>{balance.toFixed(3)}</div>
+                <div style={{ fontSize: 10, color: "rgba(167,139,250,0.3)", letterSpacing: 2 }}>MON</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: MONAD_GREEN }}>{balance.toFixed(3)}</div>
               </div>
-              <div style={{ fontSize: 9, color: MONAD_LIGHT, background: "rgba(131,110,249,0.1)", padding: "3px 8px", borderRadius: 6 }}>
+              <div style={{ fontSize: 13, color: MONAD_LIGHT, background: "rgba(131,110,249,0.1)", padding: "5px 12px", borderRadius: 6 }}>
                 {account.slice(0, 6)}...{account.slice(-4)}
               </div>
             </div>
           ) : (
             <button onClick={connectWallet} disabled={connecting} style={{
               background: `linear-gradient(135deg, ${MONAD_PURPLE}, ${MONAD_HOT})`,
-              border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 700,
-              padding: "6px 16px", cursor: "pointer", fontFamily: "inherit", letterSpacing: 1,
+              border: "none", borderRadius: 8, color: "#fff", fontSize: 16, fontWeight: 700,
+              padding: "10px 20px", cursor: "pointer", fontFamily: "inherit", letterSpacing: 1,
               opacity: connecting ? 0.5 : 1,
             }}>
               {connecting ? "CONNECTING..." : "CONNECT WALLET"}
@@ -564,24 +563,24 @@ export default function EchoNad() {
       {/* MAIN */}
       <div style={{ flex: 1, display: "flex" }}>
         {/* BET SIDEBAR */}
-        <div style={{ width: 58, borderRight: "1px solid rgba(131,110,249,0.06)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 6, background: "rgba(11,4,21,0.3)" }}>
-          <div style={{ fontSize: 7, color: "rgba(167,139,250,0.25)", letterSpacing: 1, marginBottom: 2 }}>BET</div>
+        <div style={{ width: 80, borderRight: "1px solid rgba(131,110,249,0.06)", display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0", gap: 8, background: "rgba(11,4,21,0.3)" }}>
+          <div style={{ fontSize: 11, color: "rgba(167,139,250,0.4)", letterSpacing: 1, marginBottom: 3, fontWeight: 600 }}>BET</div>
           {[0.001, 0.01, 0.05, 0.1, 0.5].map(s => (
             <button key={s} onClick={() => setBetSize(s)} style={{
-              width: 44, height: 28, borderRadius: 5, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-              border: betSize === s ? `1.5px solid ${MONAD_GOLD}` : "1px solid rgba(131,110,249,0.1)",
-              background: betSize === s ? "rgba(251,191,36,0.12)" : "transparent",
-              color: betSize === s ? MONAD_GOLD : "rgba(167,139,250,0.3)",
+              width: 62, height: 36, borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+              border: betSize === s ? `2px solid ${MONAD_GOLD}` : "1px solid rgba(131,110,249,0.15)",
+              background: betSize === s ? "rgba(251,191,36,0.15)" : "transparent",
+              color: betSize === s ? MONAD_GOLD : "rgba(167,139,250,0.4)",
             }}>{s}</button>
           ))}
-          <div style={{ marginTop: "auto", fontSize: 7, color: "rgba(131,110,249,0.15)", writingMode: "vertical-rl", letterSpacing: 2 }}>MONAD</div>
+          <div style={{ marginTop: "auto", fontSize: 10, color: "rgba(131,110,249,0.2)", writingMode: "vertical-rl", letterSpacing: 2, fontWeight: 600 }}>MONAD</div>
         </div>
 
         {/* RADAR */}
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
           <svg viewBox="0 0 500 500" style={{ width: "min(500px, 68vh)", height: "min(500px, 68vh)" }}>
-            <text x={CX} y={16} textAnchor="middle" fill={MONAD_GREEN} fontSize="9" fontWeight="bold" fontFamily="monospace" opacity="0.5" style={{pointerEvents: "none"}}>BULLISH</text>
-            <text x={CX} y={492} textAnchor="middle" fill={MONAD_RED} fontSize="9" fontWeight="bold" fontFamily="monospace" opacity="0.5" style={{pointerEvents: "none"}}>BEARISH</text>
+            <text x={CX} y={20} textAnchor="middle" fill={MONAD_GREEN} fontSize="14" fontWeight="bold" fontFamily="monospace" opacity="0.6" style={{pointerEvents: "none"}}>BULLISH</text>
+            <text x={CX} y={490} textAnchor="middle" fill={MONAD_RED} fontSize="14" fontWeight="bold" fontFamily="monospace" opacity="0.6" style={{pointerEvents: "none"}}>BEARISH</text>
             {grid}
             {cells}
             {sweepEl}
@@ -597,22 +596,22 @@ export default function EchoNad() {
             </g>
             {/* CENTER */}
             <circle cx={CX} cy={CY} r={MIN_R} fill={MONAD_DEEP} stroke="rgba(131,110,249,0.25)" strokeWidth="0.8" style={{pointerEvents: "none"}} />
-            <text x={CX} y={CY - 10} textAnchor="middle" fill={MONAD_GOLD} fontSize="12" fontWeight="700" fontFamily="monospace" style={{pointerEvents: "none"}}>${curPrice.toFixed(4)}</text>
-            <text x={CX} y={CY + 4} textAnchor="middle" fill={delta >= 0 ? MONAD_GREEN : MONAD_RED} fontSize="9" fontFamily="monospace" style={{pointerEvents: "none"}}>{delta >= 0 ? "+" : ""}{(delta * 10000).toFixed(1)}bp</text>
-            <text x={CX} y={CY + 17} textAnchor="middle" fill="rgba(131,110,249,0.3)" fontSize="7" fontFamily="monospace" style={{pointerEvents: "none"}}>MON/USD</text>
+            <text x={CX} y={CY - 12} textAnchor="middle" fill={MONAD_GOLD} fontSize="18" fontWeight="700" fontFamily="monospace" style={{pointerEvents: "none"}}>${curPrice.toFixed(4)}</text>
+            <text x={CX} y={CY + 6} textAnchor="middle" fill={delta >= 0 ? MONAD_GREEN : MONAD_RED} fontSize="13" fontFamily="monospace" style={{pointerEvents: "none"}}>{delta >= 0 ? "+" : ""}{(delta * 10000).toFixed(1)}bp</text>
+            <text x={CX} y={CY + 22} textAnchor="middle" fill="rgba(131,110,249,0.4)" fontSize="10" fontFamily="monospace" style={{pointerEvents: "none"}}>MON/USD</text>
             {/* SECTOR LABELS */}
             {SECTOR_META.map((sl, s) => {
               const a = s * SECTOR_ANGLE + SECTOR_ANGLE / 2;
-              const p = polarToCart(CX, CY, MAX_R + 16, a);
-              return (<g key={s} style={{pointerEvents: "none"}}><text x={p.x} y={p.y - 3} textAnchor="middle" dominantBaseline="middle" fill={s === activeSector ? (sl.up ? MONAD_GREEN : MONAD_RED) : "rgba(131,110,249,0.2)"} fontSize="7" fontWeight={s === activeSector ? "bold" : "normal"} fontFamily="monospace">{sl.shortDir}</text><text x={p.x} y={p.y + 5} textAnchor="middle" dominantBaseline="middle" fill={s === activeSector ? (sl.up ? MONAD_GREEN : MONAD_RED) : "rgba(131,110,249,0.15)"} fontSize="5.5" fontFamily="monospace">{sl.label}</text></g>);
+              const p = polarToCart(CX, CY, MAX_R + 20, a);
+              return (<g key={s} style={{pointerEvents: "none"}}><text x={p.x} y={p.y - 4} textAnchor="middle" dominantBaseline="middle" fill={s === activeSector ? (sl.up ? MONAD_GREEN : MONAD_RED) : "rgba(131,110,249,0.3)"} fontSize="11" fontWeight={s === activeSector ? "bold" : "normal"} fontFamily="monospace">{sl.shortDir}</text><text x={p.x} y={p.y + 8} textAnchor="middle" dominantBaseline="middle" fill={s === activeSector ? (sl.up ? MONAD_GREEN : MONAD_RED) : "rgba(131,110,249,0.2)"} fontSize="8" fontFamily="monospace">{sl.label}</text></g>);
             })}
             {/* RING LABELS */}
             {RING_LABELS.map((l, i) => {
               const p = polarToCart(CX, CY, MIN_R + i * ringW + ringW / 2, 2);
-              return <text key={i} x={p.x + 3} y={p.y} fill={i === activeRing ? MONAD_GOLD : "rgba(131,110,249,0.2)"} fontSize="8" fontFamily="monospace" fontWeight={i === activeRing ? "bold" : "normal"} dominantBaseline="middle" style={{pointerEvents: "none"}}>{l}</text>;
+              return <text key={i} x={p.x + 4} y={p.y} fill={i === activeRing ? MONAD_GOLD : "rgba(131,110,249,0.3)"} fontSize="12" fontFamily="monospace" fontWeight={i === activeRing ? "bold" : "normal"} dominantBaseline="middle" style={{pointerEvents: "none"}}>{l}</text>;
             })}
             {/* FLOATS */}
-            {floats.map(f => <text key={f.id} x={f.x} y={f.y} textAnchor="middle" fill={f.color} fontSize="12" fontWeight="bold" fontFamily="monospace" opacity={f.life} style={{pointerEvents: "none"}}>{f.text}</text>)}
+            {floats.map(f => <text key={f.id} x={f.x} y={f.y} textAnchor="middle" fill={f.color} fontSize="18" fontWeight="bold" fontFamily="monospace" opacity={f.life} style={{pointerEvents: "none"}}>{f.text}</text>)}
           </svg>
 
           {/* TX STATUS BAR */}
@@ -628,9 +627,9 @@ export default function EchoNad() {
               <div style={{ fontSize: 7, color: "rgba(131,110,249,0.2)", letterSpacing: 1, marginBottom: 2 }}>MON/USD</div>
               {chart}
             </div>
-            <div style={{ display: "flex", gap: 3, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 220 }}>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 280 }}>
               {results.slice(-8).map((r, i) => (
-                <div key={i} style={{ fontSize: 8, padding: "1px 6px", borderRadius: 3, background: r.win ? "rgba(74,222,128,0.1)" : "rgba(251,113,133,0.1)", color: r.win ? MONAD_GREEN : MONAD_RED, border: `1px solid ${r.win ? "rgba(74,222,128,0.2)" : "rgba(251,113,133,0.2)"}` }}>
+                <div key={i} style={{ fontSize: 11, padding: "3px 9px", borderRadius: 4, background: r.win ? "rgba(74,222,128,0.12)" : "rgba(251,113,133,0.12)", color: r.win ? MONAD_GREEN : MONAD_RED, border: `1.5px solid ${r.win ? "rgba(74,222,128,0.25)" : "rgba(251,113,133,0.25)"}`, fontWeight: 600 }}>
                   {r.win ? `+${r.amount}` : `-${r.amount}`}
                 </div>
               ))}
@@ -639,47 +638,47 @@ export default function EchoNad() {
         </div>
 
         {/* RIGHT PANEL */}
-        <div style={{ width: 165, borderLeft: "1px solid rgba(131,110,249,0.06)", padding: 12, display: "flex", flexDirection: "column", gap: 10, background: "rgba(11,4,21,0.3)", fontSize: 10 }}>
-          <div style={{ fontSize: 8, color: "rgba(131,110,249,0.3)", letterSpacing: 2 }}>HOW IT WORKS</div>
-          <div style={{ color: "rgba(167,139,250,0.45)", lineHeight: 1.6, fontSize: 9 }}>
-            <span style={{ color: MONAD_GREEN }}>Top</span> = MON going <span style={{ color: MONAD_GREEN }}>UP</span><br />
-            <span style={{ color: MONAD_RED }}>Bottom</span> = MON going <span style={{ color: MONAD_RED }}>DOWN</span><br />
-            <span style={{ color: MONAD_GOLD }}>Outer rings</span> = more vol = bigger payout<br /><br />
-            Tap a sector. <span style={{ color: MONAD_PURPLE }}>Sweep</span> rotates. If <span style={{ color: MONAD_GOLD }}>ping</span> is on your sector = <span style={{ color: MONAD_GREEN }}>WIN</span>.
+        <div style={{ width: 220, borderLeft: "1px solid rgba(131,110,249,0.06)", padding: 16, display: "flex", flexDirection: "column", gap: 14, background: "rgba(11,4,21,0.3)", fontSize: 12 }}>
+          <div style={{ fontSize: 11, color: "rgba(131,110,249,0.4)", letterSpacing: 2, fontWeight: 600 }}>HOW IT WORKS</div>
+          <div style={{ color: "rgba(167,139,250,0.5)", lineHeight: 1.7, fontSize: 12 }}>
+            <span style={{ color: MONAD_GREEN, fontWeight: 600 }}>Top</span> = MON going <span style={{ color: MONAD_GREEN, fontWeight: 600 }}>UP</span><br />
+            <span style={{ color: MONAD_RED, fontWeight: 600 }}>Bottom</span> = MON going <span style={{ color: MONAD_RED, fontWeight: 600 }}>DOWN</span><br />
+            <span style={{ color: MONAD_GOLD, fontWeight: 600 }}>Outer rings</span> = more vol = bigger payout<br /><br />
+            Tap a sector. <span style={{ color: MONAD_PURPLE, fontWeight: 600 }}>Sweep</span> rotates. If <span style={{ color: MONAD_GOLD, fontWeight: 600 }}>ping</span> is on your sector = <span style={{ color: MONAD_GREEN, fontWeight: 700 }}>WIN</span>.
           </div>
 
-          <div style={{ borderTop: "1px solid rgba(131,110,249,0.06)", paddingTop: 8 }}>
-            <div style={{ fontSize: 7, color: "rgba(131,110,249,0.3)", letterSpacing: 2, marginBottom: 4 }}>RINGS</div>
+          <div style={{ borderTop: "1px solid rgba(131,110,249,0.08)", paddingTop: 10 }}>
+            <div style={{ fontSize: 10, color: "rgba(131,110,249,0.4)", letterSpacing: 2, marginBottom: 6, fontWeight: 600 }}>RINGS</div>
             {RING_LABELS.map((l, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "1px 4px", borderRadius: 3, background: i === activeRing ? "rgba(251,191,36,0.08)" : "transparent", marginBottom: 1 }}>
-                <span style={{ color: "rgba(167,139,250,0.3)", fontSize: 8 }}>{["Low", "Med", "High", "Ext"][i]}</span>
-                <span style={{ color: i === activeRing ? MONAD_GOLD : "rgba(167,139,250,0.3)", fontWeight: 700 }}>{l}</span>
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "3px 6px", borderRadius: 4, background: i === activeRing ? "rgba(251,191,36,0.1)" : "transparent", marginBottom: 2 }}>
+                <span style={{ color: "rgba(167,139,250,0.4)", fontSize: 11 }}>{["Low", "Med", "High", "Ext"][i]}</span>
+                <span style={{ color: i === activeRing ? MONAD_GOLD : "rgba(167,139,250,0.4)", fontWeight: 700, fontSize: 12 }}>{l}</span>
               </div>
             ))}
           </div>
 
-          <div style={{ borderTop: "1px solid rgba(131,110,249,0.06)", paddingTop: 8 }}>
-            <div style={{ fontSize: 7, color: "rgba(131,110,249,0.3)", letterSpacing: 2, marginBottom: 4 }}>LIVE</div>
+          <div style={{ borderTop: "1px solid rgba(131,110,249,0.08)", paddingTop: 10 }}>
+            <div style={{ fontSize: 10, color: "rgba(131,110,249,0.4)", letterSpacing: 2, marginBottom: 6, fontWeight: 600 }}>LIVE</div>
             {[["Bets", activeBets.length, MONAD_LIGHT], ["At risk", `${atRisk.toFixed(3)} MON`, MONAD_GOLD], ["PnL", `${totalPnL >= 0 ? "+" : ""}${totalPnL.toFixed(3)}`, totalPnL >= 0 ? MONAD_GREEN : MONAD_RED], ["Streak", `${streak}x`, streak >= 2 ? MONAD_HOT : "rgba(167,139,250,0.3)"]].map(([k, v, c]) => (
-              <div key={k as string} style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                <span style={{ color: "rgba(167,139,250,0.3)", fontSize: 9 }}>{k}</span>
-                <span style={{ color: c as string, fontWeight: 600, fontSize: 10 }}>{v}</span>
+              <div key={k as string} style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ color: "rgba(167,139,250,0.4)", fontSize: 12 }}>{k}</span>
+                <span style={{ color: c as string, fontWeight: 600, fontSize: 13 }}>{v}</span>
               </div>
             ))}
           </div>
 
           {lastTxHash && (
-            <div style={{ borderTop: "1px solid rgba(131,110,249,0.06)", paddingTop: 8 }}>
-              <div style={{ fontSize: 7, color: "rgba(131,110,249,0.3)", letterSpacing: 2, marginBottom: 4 }}>LAST TX</div>
+            <div style={{ borderTop: "1px solid rgba(131,110,249,0.08)", paddingTop: 10 }}>
+              <div style={{ fontSize: 10, color: "rgba(131,110,249,0.4)", letterSpacing: 2, marginBottom: 5, fontWeight: 600 }}>LAST TX</div>
               <a href={`${MONAD_TESTNET.blockExplorerUrls[0]}/tx/${lastTxHash}`} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 8, color: MONAD_PURPLE, textDecoration: "none", wordBreak: "break-all" }}>
+                style={{ fontSize: 11, color: MONAD_PURPLE, textDecoration: "none", wordBreak: "break-all" }}>
                 {lastTxHash.slice(0, 10)}...{lastTxHash.slice(-8)}
               </a>
-              {lastTxTime && <div style={{ fontSize: 8, color: MONAD_GREEN, marginTop: 2 }}>Confirmed in {lastTxTime}ms</div>}
+              {lastTxTime && <div style={{ fontSize: 11, color: MONAD_GREEN, marginTop: 3, fontWeight: 600 }}>Confirmed in {lastTxTime}ms</div>}
             </div>
           )}
 
-          <div style={{ marginTop: "auto", padding: 5, borderRadius: 4, background: "rgba(131,110,249,0.03)", border: "1px solid rgba(131,110,249,0.06)", textAlign: "center", fontSize: 7, color: "rgba(131,110,249,0.2)", letterSpacing: 1, lineHeight: 1.5 }}>
+          <div style={{ marginTop: "auto", padding: 8, borderRadius: 5, background: "rgba(131,110,249,0.04)", border: "1px solid rgba(131,110,249,0.08)", textAlign: "center", fontSize: 10, color: "rgba(131,110,249,0.3)", letterSpacing: 1, lineHeight: 1.6, fontWeight: 500 }}>
             ORACLE: REDSTONE<br />CHAIN: MONAD TESTNET<br />BLOCK TIME: 400ms
           </div>
         </div>
