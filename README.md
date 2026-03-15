@@ -36,4 +36,9 @@ Create `app/.env.local`:
 NEXT_PUBLIC_CONTRACT_ADDRESS=0x2c350284Eb76537FF8Ba287B6FDa369D1Bd34339
 ```
 
+## Links
+- **Live App**: https://app-6riqilomg-isamars-projects.vercel.app
+- **GitHub**: https://github.com/Felurianx2/echonad
+- **Contract**: https://explorer.testnet.monad.xyz/address/0x2c350284Eb76537FF8Ba287B6FDa369D1Bd34339
+
 ## Monad Blitz Rio Hackathon - March 2026
