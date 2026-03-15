@@ -38,6 +38,7 @@ contract EchoNad {
     mapping(address => uint256[]) public userBets;
     mapping(address => uint256) public userWins;
     mapping(address => uint256) public userLosses;
+    mapping(address => uint256) public userBalances;  // User deposit balances
 
     // Events
     event BetPlaced(
@@ -56,6 +57,8 @@ contract EchoNad {
         uint256 resolvePrice
     );
     event FundsDeposited(address indexed from, uint256 amount);
+    event UserDeposited(address indexed user, uint256 amount);
+    event UserWithdrew(address indexed user, uint256 amount);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
@@ -67,26 +70,51 @@ contract EchoNad {
     }
 
     /**
-     * @notice Place a bet on MON price direction
+     * @notice Deposit MON to your account balance (one-time approval)
+     */
+    function deposit() external payable {
+        require(msg.value > 0, "Must deposit something");
+        userBalances[msg.sender] += msg.value;
+        emit UserDeposited(msg.sender, msg.value);
+    }
+
+    /**
+     * @notice Withdraw your account balance
+     */
+    function withdraw(uint256 amount) external {
+        require(userBalances[msg.sender] >= amount, "Insufficient balance");
+        userBalances[msg.sender] -= amount;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Withdraw failed");
+        emit UserWithdrew(msg.sender, amount);
+    }
+
+    /**
+     * @notice Place a bet on MON price direction using deposited balance
      * @param direction 0=BULLISH (price goes up), 1=BEARISH (price goes down)
      * @param multiplier Must be 2, 5, 12, or 30 (corresponds to radar ring)
      * @param currentPrice Current MON/USD price from RedStone (8 decimals)
+     * @param amount Bet amount from your deposited balance
      */
     function placeBet(
         Direction direction,
         uint256 multiplier,
-        uint256 currentPrice
-    ) external payable returns (uint256) {
-        require(msg.value >= MIN_BET, "Below min bet");
-        require(msg.value <= MAX_BET, "Above max bet");
+        uint256 currentPrice,
+        uint256 amount
+    ) external returns (uint256) {
+        require(amount >= MIN_BET, "Below min bet");
+        require(amount <= MAX_BET, "Above max bet");
         require(currentPrice > 0, "Invalid price");
         require(_isValidMultiplier(multiplier), "Invalid multiplier");
+        require(userBalances[msg.sender] >= amount, "Insufficient balance");
+
+        userBalances[msg.sender] -= amount;
 
         uint256 betId = nextBetId++;
         bets[betId] = Bet({
             bettor: msg.sender,
             direction: direction,
-            amount: msg.value,
+            amount: amount,
             strikePrice: currentPrice,
             resolvePrice: 0,
             multiplier: multiplier,
@@ -96,9 +124,9 @@ contract EchoNad {
 
         userBets[msg.sender].push(betId);
         totalBets++;
-        totalVolume += msg.value;
+        totalVolume += amount;
 
-        emit BetPlaced(betId, msg.sender, direction, msg.value, multiplier, currentPrice);
+        emit BetPlaced(betId, msg.sender, direction, amount, multiplier, currentPrice);
         return betId;
     }
 
@@ -130,14 +158,9 @@ contract EchoNad {
             uint256 fee = (grossPayout * FEE_BPS) / 10000;
             uint256 netPayout = grossPayout - fee;
 
-            // Cap payout to contract balance
-            if (netPayout > address(this).balance) {
-                netPayout = address(this).balance;
-            }
-
             userWins[bet.bettor]++;
-            (bool sent, ) = bet.bettor.call{value: netPayout}("");
-            require(sent, "Payout failed");
+            // Add winnings to user's balance (no transfer needed!)
+            userBalances[bet.bettor] += netPayout;
 
             emit BetResolved(betId, bet.bettor, true, netPayout, resolvePrice);
         } else {
@@ -189,8 +212,8 @@ contract EchoNad {
         emit FundsDeposited(msg.sender, msg.value);
     }
 
-    // Owner withdraw (for hackathon)
-    function withdraw(uint256 amount) external onlyOwner {
+    // Owner withdraw from pool (for hackathon)
+    function withdrawPool(uint256 amount) external onlyOwner {
         (bool sent, ) = owner.call{value: amount}("");
         require(sent, "Withdraw failed");
     }

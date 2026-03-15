@@ -15,7 +15,10 @@ const MONAD_TESTNET = {
 };
 
 const CONTRACT_ABI = [
-  "function placeBet(uint8 direction, uint256 multiplier, uint256 currentPrice) external payable returns (uint256)",
+  "function deposit() external payable",
+  "function withdraw(uint256 amount) external",
+  "function userBalances(address user) external view returns (uint256)",
+  "function placeBet(uint8 direction, uint256 multiplier, uint256 currentPrice, uint256 amount) external returns (uint256)",
   "function resolveBet(uint256 betId, uint256 resolvePrice) external",
   "function getBet(uint256 betId) external view returns (tuple(address bettor, uint8 direction, uint256 amount, uint256 strikePrice, uint256 resolvePrice, uint256 multiplier, uint256 timestamp, uint8 status))",
   "function getUserStats(address user) external view returns (uint256 wins, uint256 losses, uint256 betCount)",
@@ -24,6 +27,8 @@ const CONTRACT_ABI = [
   "function totalVolume() external view returns (uint256)",
   "event BetPlaced(uint256 indexed betId, address indexed bettor, uint8 direction, uint256 amount, uint256 multiplier, uint256 strikePrice)",
   "event BetResolved(uint256 indexed betId, address indexed bettor, bool won, uint256 payout, uint256 resolvePrice)",
+  "event UserDeposited(address indexed user, uint256 amount)",
+  "event UserWithdrew(address indexed user, uint256 amount)",
 ];
 
 // ============================================
@@ -141,7 +146,8 @@ export default function EchoNad() {
   const [tickCounter, setTickCounter] = useState(0);  // BUG FIX 1: Add tick counter
 
   // Game state
-  const [balance, setBalance] = useState(0);
+  const [balance, setBalance] = useState(0); // Wallet balance
+  const [contractBalance, setContractBalance] = useState(0); // Deposited balance in contract
   const [betSize, setBetSize] = useState(0.01);
   const [activeBets, setActiveBets] = useState([]);
   const [activeSector, setActiveSector] = useState(3);
@@ -374,34 +380,38 @@ export default function EchoNad() {
       return;
     }
 
+    if (contractBalance < betSize) {
+      alert("Insufficient balance in contract. Please deposit MON first!");
+      return;
+    }
+
     // Add to local radar immediately (optimistic)
     const localBet = { id: Math.random(), ring, sector, amount: betSize, placedAt: scanRef.current };
     setActiveBets(prev => [...prev, localBet]);
 
-    // Send on-chain tx - Monad is INSTANT (400ms blocks)
+    // Send on-chain tx - uses deposited balance (NO POPUP!)
     const txStart = performance.now();
     try {
       const direction = sector <= 3 ? 0 : 1; // 0=BULLISH, 1=BEARISH
       const multiplier = RING_MULTS[ring];
       const priceWith8Decimals = Math.round(curPrice * 1e8).toString(16);
+      const amountHex = Math.round(betSize * 1e18).toString(16);
 
-      // Encode function call: placeBet(uint8,uint256,uint256)
+      // Encode function call: placeBet(uint8,uint256,uint256,uint256) - NEW SIGNATURE!
       const data = "0x" + [
-        "b6846e30", // function selector for placeBet(uint8,uint256,uint256)
+        "fa085f94", // function selector for placeBet(uint8,uint256,uint256,uint256)
         direction.toString(16).padStart(64, "0"),
         multiplier.toString(16).padStart(64, "0"),
         priceWith8Decimals.padStart(64, "0"),
+        amountHex.padStart(64, "0"),
       ].join("");
 
-      const value = "0x" + Math.round(betSize * 1e18).toString(16);
-
-      // Send transaction - Monad confirms in ~400ms!
+      // NO VALUE - uses deposited balance!
       const txHash = await window.ethereum.request({
         method: "eth_sendTransaction",
         params: [{
           from: account,
           to: CONTRACT_ADDRESS,
-          value: value,
           data: data,
           gas: "0x30D40", // 200000
         }],
@@ -410,15 +420,60 @@ export default function EchoNad() {
       const txEnd = performance.now();
       setLastTxHash(txHash);
       setLastTxTime(Math.round(txEnd - txStart));
-      setBalance(b => b - betSize);
+      setContractBalance(b => b - betSize);
 
     } catch (e) {
       console.error("Tx error:", e);
       // Remove optimistic bet
       setActiveBets(prev => prev.filter(b => b.id !== localBet.id));
     }
-    setTxPending(false);
-  }, [account, chainOk, balance, betSize, curPrice, connectWallet]);
+  }, [account, chainOk, contractBalance, betSize, curPrice, connectWallet]);
+
+  // Deposit MON to contract (ONE-TIME APPROVAL!)
+  const depositToContract = useCallback(async (amount: number) => {
+    if (!account || !chainOk) return;
+    try {
+      const value = "0x" + Math.round(amount * 1e18).toString(16);
+      const txHash = await window.ethereum.request({
+        method: "eth_sendTransaction",
+        params: [{
+          from: account,
+          to: CONTRACT_ADDRESS,
+          value: value,
+          data: "0xd0e30db0", // deposit()
+          gas: "0x15F90", // 90000
+        }],
+      });
+      setLastTxHash(txHash);
+      setBalance(b => b - amount);
+      setContractBalance(b => b + amount);
+    } catch (e) {
+      console.error("Deposit error:", e);
+    }
+  }, [account, chainOk]);
+
+  // Withdraw from contract
+  const withdrawFromContract = useCallback(async (amount: number) => {
+    if (!account || !chainOk) return;
+    try {
+      const amountHex = Math.round(amount * 1e18).toString(16);
+      const data = "0x2e1a7d4d" + amountHex.padStart(64, "0"); // withdraw(uint256)
+      const txHash = await window.ethereum.request({
+        method: "eth_sendTransaction",
+        params: [{
+          from: account,
+          to: CONTRACT_ADDRESS,
+          data: data,
+          gas: "0x15F90", // 90000
+        }],
+      });
+      setLastTxHash(txHash);
+      setBalance(b => b + amount);
+      setContractBalance(b => b - amount);
+    } catch (e) {
+      console.error("Withdraw error:", e);
+    }
+  }, [account, chainOk]);
 
   // ============================================
   // DERIVED STATE
@@ -538,11 +593,18 @@ export default function EchoNad() {
           )}
           {streak >= 2 && <div style={{ background: `linear-gradient(90deg,${MONAD_PURPLE},${MONAD_HOT},${MONAD_PURPLE})`, backgroundSize: "200% auto", animation: "streak-flash 2s linear infinite", padding: "4px 14px", borderRadius: 20, fontSize: 14, fontWeight: 700 }}>{streak}x STREAK</div>}
           {account ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 10, color: "rgba(167,139,250,0.3)", letterSpacing: 2 }}>MON</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: MONAD_GREEN }}>{balance.toFixed(3)}</div>
+                <div style={{ fontSize: 10, color: "rgba(167,139,250,0.3)", letterSpacing: 2 }}>DEPOSITED</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: MONAD_GOLD }}>{contractBalance.toFixed(3)}</div>
               </div>
+              <button onClick={() => depositToContract(0.1)} style={{
+                background: `linear-gradient(135deg, ${MONAD_GOLD}, ${MONAD_HOT})`,
+                border: "none", borderRadius: 6, color: "#000", fontSize: 14, fontWeight: 700,
+                padding: "8px 16px", cursor: "pointer", fontFamily: "inherit", letterSpacing: 1,
+              }}>
+                DEPOSIT 0.1 MON
+              </button>
               <div style={{ fontSize: 13, color: MONAD_LIGHT, background: "rgba(131,110,249,0.1)", padding: "5px 12px", borderRadius: 6 }}>
                 {account.slice(0, 6)}...{account.slice(-4)}
               </div>
