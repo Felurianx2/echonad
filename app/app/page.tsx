@@ -288,18 +288,22 @@ export default function EchoNad() {
     return () => { mounted = false; clearInterval(iv); };
   }, []);
 
-  // Update sector/ring from prices
+  // Update sector/ring from prices - ALWAYS update when tick changes
   useEffect(() => {
     if (prices.length < 8) return;
     const now = prices[prices.length - 1];
     const prev6 = prices[prices.length - 7];
     const pct = ((now - prev6) / prev6) * 100;
-    setActiveSector(pctToSector(pct));
+    const newSector = pctToSector(pct);
     const diffs = [];
     for (let i = Math.max(1, prices.length - 10); i < prices.length; i++)
       diffs.push(Math.abs(prices[i] - prices[i - 1]) / prices[i - 1]);
-    setActiveRing(volToRing(diffs));
-  }, [tickCounter]);  // BUG FIX 1: Changed from prices.length to tickCounter
+    const newRing = volToRing(diffs);
+
+    // Force update even if same values
+    setActiveSector(newSector);
+    setActiveRing(newRing);
+  }, [tickCounter, prices]);  // Depend on both to ensure updates
 
   // ============================================
   // SWEEP + BET RESOLUTION
@@ -554,9 +558,9 @@ export default function EchoNad() {
     const d = prices.slice(-25);
     if (d.length < 2) return null;
     const mn = Math.min(...d) - 0.0001, mx = Math.max(...d) + 0.0001;
-    const w = 155, h = 36;
+    const w = 250, h = 80;
     const pts = d.map((p, i) => `${(i / (d.length - 1)) * w},${h - ((p - mn) / (mx - mn)) * h}`).join(" ");
-    return <svg width={w} height={h}><polyline points={pts} fill="none" stroke={MONAD_PURPLE} strokeWidth="1.5" opacity="0.5" /><circle cx={w} cy={h - ((d[d.length - 1] - mn) / (mx - mn)) * h} r="3" fill={PING_COLOR} /></svg>;
+    return <svg width={w} height={h}><polyline points={pts} fill="none" stroke={MONAD_PURPLE} strokeWidth="3" opacity="0.8" /><circle cx={w} cy={h - ((d[d.length - 1] - mn) / (mx - mn)) * h} r="4" fill={PING_COLOR} /></svg>;
   }, [prices]);
 
   const atRisk = activeBets.reduce((a, b) => a + b.amount, 0);
