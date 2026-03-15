@@ -1,0 +1,12 @@
+.env.local
+.env
+.vercel
+node_modules
+out
+cache
+broadcast
+*.key
+QUICKREF.txt
+.next
+dist
+build
